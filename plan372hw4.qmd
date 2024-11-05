@@ -1,0 +1,221 @@
+---
+title: "Plan372hw4"
+format: html
+editor: visual
+---
+
+```{r}
+rm(list=ls())
+
+# Load essential libraries for data manipulation
+library(tidyverse)
+library(tidycensus)
+library(sf)
+library(ggplot2)
+
+```
+
+```{r}
+# Load the airport pairs dataset
+airport_pairs <- read_csv("/Users/haleymatan/Downloads/plan372/airport_pairs.csv")
+```
+
+```{r}
+# Question 1 
+
+# Filter for RDU routes with more than 10,000 passengers
+rdu_routes <- airport_pairs %>%
+  filter((origin == "RDU" | dest == "RDU") & passengers > 10000) #Select rows where either origin or destination is RDU and passengers > 10,000
+
+# Summarize total passengers for each RDU route
+summary <- rdu_routes %>%
+  group_by(origin, dest) %>% #Group by origin and destination
+  summarize(total_passengers = sum(passengers), .groups = 'drop')  #Calculate the total passengers for each route
+
+# Print the final summary table
+print(summary)
+```
+
+```{r}
+# Question 2: Getting Census Data
+
+# Retrieve Census Data
+census_data <- get_acs(
+  geography = "cbsa", #Specify geography level as CBSA
+  variables = c(
+    "population" = "B01003_001", #Total population variable
+    "median_income" = "B19013_001", #Median household income variable
+    "labor_force_participation" = "B23025_003" #Labor force participation variable
+  ),
+  year = 2022, #Use 2022 data
+  survey = "acs5", #5-year survey
+  output = "wide" #Format data in wide format
+)
+
+# Select columns from the data: GEOID, NAME, and estimates for each variable
+census_data <- census_data %>%
+  select(GEOID, NAME,populationE, median_incomeE, labor_force_participationE)
+
+# Rename columns for easier reference 
+census_data <- census_data %>%
+  rename(
+    name = NAME,
+    population = populationE,
+    median_income = median_incomeE,
+    labor_force_participation = labor_force_participationE
+  )
+
+```
+
+```{r}
+# Question 2: Brining in Census Data pt. 1
+
+# Create a dataset with origin census data and rename columns to indicate "origin" 
+origin_data <- census_data %>%
+  rename(
+    origin_cbsa = GEOID,
+    origin_name = name,
+    origin_pop = population,
+    origin_income = median_income,
+    origin_lfpr = labor_force_participation
+  )
+# Create a dataset with destination census data and rename columns to indicate "destination" 
+destination_data <- census_data %>%
+  rename(
+    dest_cbsa = GEOID,
+    dest_name = name,
+    dest_pop = population,
+    dest_income = median_income,
+    dest_lfpr = labor_force_participation
+  )
+
+# Make origin and destination census data codes in airport_pairs character type for joining
+airport_pairs <- airport_pairs %>%
+  mutate(
+    origin_cbsa = as.character(origin_cbsa),
+    dest_cbsa = as.character(dest_cbsa)
+  )
+
+# Join origin data with airport_pairs
+airport_pairs <- airport_pairs %>%
+  left_join(origin_data, by = c("origin_cbsa" = "origin_cbsa")) %>%
+   # Join destination data with airport_pairs
+  left_join(destination_data, by = c("dest_cbsa" = "dest_cbsa"))
+
+```
+
+```{r}
+# Question 2: Bringing in Census Data pt. 2 CBSA to CBSA
+
+# Summarize the data by each CBSA-to-CBSA airport pair
+cbsa_to_cbsa <- airport_pairs %>%
+  group_by(origin_cbsa, dest_cbsa) %>% # Group by origin and destination data
+  summarize(
+   passengers = sum(passengers), # Sum passengers between each origin-destination pair
+   # Retrieve variable for each grouped pair
+    origin_pop = first(origin_pop),  
+    dest_pop = first(dest_pop),
+    distancemiles = first(distancemiles),  
+    origin_income = first(origin_income),
+    dest_income = first(dest_income),
+    origin_lfpr = first(origin_lfpr),
+    dest_lfpr = first(dest_lfpr),
+    .groups = 'drop' 
+  )
+
+# Filter out  rows where either origin or destination CBSA are missing
+cbsa_to_cbsa <- cbsa_to_cbsa %>%
+  filter(!is.na(origin_cbsa) & !is.na(dest_cbsa)) # Exclude rows with NA values 
+
+```
+
+```{r}
+#Question 2: Brining in Census data pt.3 Scatterplots
+
+# Scatter plot of Origin population vs. Total passengers
+ggplot(cbsa_to_cbsa, aes(x = origin_pop, y = passengers)) +
+  geom_point(alpha = 0.5) +
+  labs(
+    title = "Origin Population vs. Total Passengers", #Set the plot title
+    x = "Origin Population",  #Label x-axis as Origin Population
+    y = "Total Passengers" #Label y-axis as Total Passengers
+  ) +
+  theme_minimal() #Use a minimal theme 
+
+# Scatter plot of Destination population vs. Total passengers
+ggplot(cbsa_to_cbsa, aes(x = dest_pop, y = passengers)) +
+  geom_point(alpha = 0.5) +
+  labs(
+    title = "Destination Population vs. Total Passengers", #Set the plot title
+    x = "Destination Population",  #Label x-axis as Destination Population
+    y = "Total Passengers" #Label y-axis as Total Passengers
+  ) +
+  theme_minimal() #Use a minimal theme 
+
+# Scatter plot of Distance (miles) vs. Total passengers
+ggplot(cbsa_to_cbsa, aes(x = distancemiles, y = passengers)) +
+  geom_point(alpha = 0.5) +
+  labs(
+    title = "Distance vs. Total Passengers",  #Set the plot title
+    x = "Distance (miles)", #Label x-axis as Distance in miles
+    y = "Total Passengers"  #Label y-axis as Total Passengers
+  ) +
+  theme_minimal() #Use a minimal theme 
+
+# Scatter plot of Origin median income vs. Total passengers
+ggplot(cbsa_to_cbsa, aes(x = origin_income, y = passengers)) +
+  geom_point(alpha = 0.5) + 
+  labs(
+    title = "Origin Median Income vs. Total Passengers",  #Set the plot title
+    x = "Origin Median Income", #Label x-axis as Origin Median Income
+    y = "Total Passengers" #Label y-axis as Total Passengers
+  ) +
+  theme_minimal() #Use a minimal theme 
+```
+
+```{r}
+#Question 3: Passengar volume regression
+
+# Create linear regression model to predict the number of passengers
+regression_model <- lm(passengers ~ origin_pop + dest_pop + distancemiles + origin_income + dest_income,  #Specify  variables
+            data = cbsa_to_cbsa) #Use cbsa_to_cbsa dataset
+summary(regression_model) #Display summary of the regression model results
+```
+
+```{r}
+# Question 4: Passengar volume prediction
+library(tibble)
+# Define passengar_demand with variables
+passengar_demand <- tribble(
+  ~origin_pop, ~dest_pop, ~distancemiles, ~origin_income, ~dest_income,
+  # RDU to Portland
+  1420825,     2505312,   2363,           91818,          90451,
+  # RDU to El Paso
+  1420825,     867161,    1606,           91818,          55344,
+  # RDU to Tallahassee
+ 1420825,     386064,    496,            91818,          59757,
+  # RDU to Sacramento
+  1420825,     2394673,   2345,           91818,          89227,
+  
+# Reverse directions
+ # Portland to RDU
+  2505312,     1420825,   2363,           90451,          91818,
+  # El Paso to RDU
+ 867161,      1420825,   1606,           55344,          91818,
+  # Tallahassee to RDU
+  386064,      1420825,   496,            59757,          91818,
+  # Sacramento to RDU
+  2394673,     1420825,   2345,           89227,          91818,
+)
+
+passengar_demand$predict_passengers <- predict(regression_model, newdata = passengar_demand)
+
+passengar_demand <- passengar_demand %>%
+  mutate(
+    Route = c("RDU to PDX", "RDU to ELP", "RDU to TLH", "RDU to SMF", 
+              "PDX to RDU", "ELP to RDU", "TLH to RDU", "SMF to RDU")
+  ) %>%
+  select(Route, origin_pop, dest_pop, distancemiles, origin_income, dest_income, predict_passengers)
+
+print(passengar_demand)
+```
