@@ -208,14 +208,18 @@ passengar_demand <- tribble(
   2394673,     1420825,   2345,           89227,          91818,
 )
 
+# Use regression model to predict passenger demand and store the result in a new column
 passengar_demand$predict_passengers <- predict(regression_model, newdata = passengar_demand)
 
+# Add a Route column with specific route names, then select and reorder columns
 passengar_demand <- passengar_demand %>%
   mutate(
+    # Define the Route names for each row
     Route = c("RDU to PDX", "RDU to ELP", "RDU to TLH", "RDU to SMF", 
               "PDX to RDU", "ELP to RDU", "TLH to RDU", "SMF to RDU")
   ) %>%
+  # Select and reorder columns 
   select(Route, origin_pop, dest_pop, distancemiles, origin_income, dest_income, predict_passengers)
-
+# Print to view routes and predicted passenger demand
 print(passengar_demand)
 ```
