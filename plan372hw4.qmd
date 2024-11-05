@@ -68,7 +68,7 @@ census_data <- census_data %>%
 ```
 
 ```{r}
-# Question 2: Brining in Census Data pt. 1
+# Question 2: Bringing in Census Data pt. 1
 
 # Create a dataset with origin census data and rename columns to indicate "origin" 
 origin_data <- census_data %>%
@@ -123,14 +123,14 @@ cbsa_to_cbsa <- airport_pairs %>%
     .groups = 'drop' 
   )
 
-# Filter out  rows where either origin or destination CBSA are missing
+# Filter out rows where either origin or destination CBSA are missing
 cbsa_to_cbsa <- cbsa_to_cbsa %>%
   filter(!is.na(origin_cbsa) & !is.na(dest_cbsa)) # Exclude rows with NA values 
 
 ```
 
 ```{r}
-#Question 2: Brining in Census data pt.3 Scatterplots
+#Question 2: Bringing in Census data pt.3 Scatterplots
 
 # Scatter plot of Origin population vs. Total passengers
 ggplot(cbsa_to_cbsa, aes(x = origin_pop, y = passengers)) +
