@@ -2,6 +2,7 @@
 title: "plan372hw6"
 format: html
 editor: visual
+git hub link: https://github.com/hmatan18/plan372hw6.git
 ---
 
 ```{r}
