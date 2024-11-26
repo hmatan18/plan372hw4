@@ -1,0 +1,93 @@
+---
+title: "plan372hw5"
+format: html
+editor: visual
+---
+
+```{r}
+rm(list = ls())
+
+# Load packages
+library(dplyr)
+library(ggplot2)
+
+# Load the dataset
+setwd("/Users/haleymatan/Downloads")
+tree_data <- read.csv("TS3_Raw_tree_data.csv")
+```
+
+```{r}
+# Question 1
+# Clean the City column to extract city names and state names
+tree_data <- tree_data %>%
+  mutate(
+  # Extracts the city name by removing everything after the comma
+    City_Name = sub(",.*$", "", City), 
+# Extracts the state name by removing everything before and including the comma
+    State = sub("^.*, ", "", City)     
+  )
+# Count the number of records for each state and arrange in descending order of sample size
+state_records <- tree_data %>%
+  count(State, name = "Sample_Size") %>%
+  arrange(desc(Sample_Size))
+
+# Print the resuls
+print(state_records)
+```
+
+```{r}
+# Question 2
+# Filter the dataset to include only rows where the state is either NC or SC
+filter_data <- tree_data %>%
+  filter(State == "NC" | State == "SC")
+
+# Print filtered dataset
+print(filter_data)
+
+# Extract the unique city names and state names from the filtered data
+filter_cities <- unique(filter_data[, c("City_Name", "State")])
+
+# Print the results
+print(filter_cities)
+```
+
+```{r}
+# Question 3
+# Add a new column to extract the genus from the scientific name
+filter_data <- filter_data %>%
+# Extract the genus by taking the first word of the scientific name
+  mutate(Genus = sub(" .*", "", ScientificName))
+
+# Calculate the average crown diameter for each genus
+average_crown <- filter_data %>%
+  mutate(Genus = sub(" .*", "", ScientificName)) %>%  # Extract genus
+  group_by(Genus) %>%   # Group data by genus
+  summarize(Avg_Crown_Diameter = mean(as.numeric(AvgCdia..m.), na.rm = TRUE))  # Calculate mean crown diameter, ignoring missing values
+  
+
+# Identify the genus with the largest average crown diameter
+largest_crown <- average_crown %>%
+  filter(Avg_Crown_Diameter == max(Avg_Crown_Diameter, na.rm = TRUE))
+
+# Print result
+print(largest_crown)
+```
+
+```{r}
+# Extra Credit Tree Age
+
+# Calculate average age and crown diameter by genus
+average_crown <- filter_data %>%
+  group_by(Genus) %>%
+  summarize(
+    average_age = mean(as.numeric(Age), na.rm = TRUE),
+    Avg_Crown_Diameter = mean(as.numeric(AvgCdia..m.), na.rm = TRUE)
+  ) %>%
+  arrange(desc(Avg_Crown_Diameter))
+
+# Display the table 
+print(average_crown)
+
+# The table shows differencesin the average age of the different genera of trees in the dataset. Age explains the differences in crown diameter, but it’s not the only factor. For example, Carya has an average age (28.97 years) similar to Platanus, but its crown diameter (10.50 m) is significantly smaller meaning that other factors such as species growth rate influence crown diameter
+
+```
